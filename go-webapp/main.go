@@ -11,6 +11,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const (
+	socketBufferSize  = 1024
+	messageBufferSize = 256
+)
+
+var upgrader = &websocket.Upgrader{ReadBufferSize: socketBufferSize, WriteBufferSize: socketBufferSize}
+
 type room struct {
 	forward chan []byte
 	join    chan *client
@@ -18,18 +25,33 @@ type room struct {
 	clients map[*client]bool
 }
 
+func newRoom() *room {
+	return &room{
+		forward: make(chan []byte),
+		join:    make(chan *client),
+		leave:   make(chan *client),
+		clients: make(map[*client]bool),
+	}
+}
+
 func (r *room) run() {
 	for {
 		select {
 		case client := <-r.join:
+			fmt.Println("joined")
 			r.clients[client] = true
 		case client := <-r.leave:
+			fmt.Println("leaved")
 			delete(r.clients, client)
 			close(client.send)
 		case msg := <-r.forward:
+			fmt.Println("forwarded", msg)
+			fmt.Println("size: ", len(r.clients))
 			for client := range r.clients {
 				select {
 				case client.send <- msg:
+					fmt.Println("msg: ", msg)
+					// メッセージを送信
 				default:
 					delete(r.clients, client)
 					close(client.send)
@@ -37,6 +59,23 @@ func (r *room) run() {
 			}
 		}
 	}
+}
+
+func (r *room) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	socket, err := upgrader.Upgrade(w, req, nil)
+	if err != nil {
+		log.Fatal("ServveHTTP: ", err)
+		return
+	}
+	client := &client{
+		socket: socket,
+		send:   make(chan []byte, messageBufferSize),
+		room:   r,
+	}
+	r.join <- client
+	defer func() { r.leave <- client }()
+	go client.write()
+	client.read()
 }
 
 type client struct {
@@ -78,9 +117,12 @@ func (t *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.Handle("/", &templateHandler{filename: "chat.html"})
 
-	fmt.Println("Listening :8080!")
+	r := newRoom()
+	http.Handle("/", &templateHandler{filename: "chat.html"})
+	http.Handle("/room", r)
+	go r.run()
+
 	if err := http.ListenAndServe("localhost:8080", nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
