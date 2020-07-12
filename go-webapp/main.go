@@ -2,14 +2,15 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/negibokken/go-practice/go-webapp/trace"
 )
 
 const (
@@ -24,6 +25,7 @@ type room struct {
 	join    chan *client
 	leave   chan *client
 	clients map[*client]bool
+	tracer  trace.Tracer
 }
 
 func newRoom() *room {
@@ -32,6 +34,7 @@ func newRoom() *room {
 		join:    make(chan *client),
 		leave:   make(chan *client),
 		clients: make(map[*client]bool),
+		tracer:  trace.Off(),
 	}
 }
 
@@ -39,23 +42,23 @@ func (r *room) run() {
 	for {
 		select {
 		case client := <-r.join:
-			fmt.Println("joined")
 			r.clients[client] = true
+			r.tracer.Trace("新しいクライアントが参加しました")
 		case client := <-r.leave:
-			fmt.Println("leaved")
+			r.tracer.Trace("クライアントが退室しました")
 			delete(r.clients, client)
 			close(client.send)
 		case msg := <-r.forward:
-			fmt.Println("forwarded", msg)
-			fmt.Println("size: ", len(r.clients))
+			r.tracer.Trace("新しいメッセージを受信しました: ", string(msg))
 			for client := range r.clients {
 				select {
 				case client.send <- msg:
-					fmt.Println("msg: ", msg)
+					r.tracer.Trace(" -- クライアントに送信されました")
 					// メッセージを送信
 				default:
 					delete(r.clients, client)
 					close(client.send)
+					r.tracer.Trace(" -- 送信に失敗しました。クライアントをクリーンアップします")
 				}
 			}
 		}
@@ -121,6 +124,7 @@ func main() {
 	var addr = flag.String("addr", ":8080", "アプリケーションのアドレス")
 	flag.Parse()
 	r := newRoom()
+	r.tracer = trace.New(os.Stdout)
 	http.Handle("/", &templateHandler{filename: "chat.html"})
 	http.Handle("/room", r)
 	go r.run()
