@@ -2,10 +2,14 @@
   <head>
     <title>チャット</title>
   </head>
-    <style>
-      input {display:block;}
-      ul {list-style: none;}
-    </style>
+  <style>
+    input {
+      display: block;
+    }
+    ul {
+      list-style: none;
+    }
+  </style>
   <body>
     <ul id="messages"></ul>
     WebSocketを使ったアプリケーション
@@ -13,36 +17,35 @@
       <textarea></textarea>
       <input type="submit" value="送信" />
     </form>
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js">
-    </script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script>
       $(function() {
-        console.log("in")
+        console.log('in');
         let socket = null;
-        const msgBox = $("#chatbox textarea");
-        const messages = $("#messages");
-        $("#chatbox").submit(function() {
-          if(!msgBox.val()) return false;
-          if(!socket) {
-            alert("エラー: Websocket 接続が行われていません。");
+        const msgBox = $('#chatbox textarea');
+        const messages = $('#messages');
+        $('#chatbox').submit(function() {
+          if (!msgBox.val()) return false;
+          if (!socket) {
+            alert('エラー: Websocket 接続が行われていません。');
             return false;
           }
-          console.log(msgBox .val());
+          console.log(msgBox.val());
           socket.send(msgBox.val());
-          msgBox.val("");
+          msgBox.val('');
           return false;
         });
-        if(!window["WebSocket"]) {
-          alert("エラー: WebSocketに対応していないブラウザです。")
+        if (!window['WebSocket']) {
+          alert('エラー: WebSocketに対応していないブラウザです。');
         } else {
-          socket = new WebSocket("ws://{{.Host}}/room");
-          socket.onclose = function () {
-            alert("接続が終了しました。");
-          }
+          socket = new WebSocket('ws://{{.Host}}/room');
+          socket.onclose = function() {
+            alert('接続が終了しました。');
+          };
           socket.onmessage = function(e) {
-            console.log("onmessaage", e.data)
-            messages.append($("<li>").text(e.data));
-          }
+            console.log('onmessaage', e.data);
+            messages.append($('<li>').text(e.data));
+          };
         }
       });
     </script>
