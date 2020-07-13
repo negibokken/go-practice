@@ -17,6 +17,7 @@
       {{.UserData.name}}: <br />
       <textarea></textarea>
       <input type="submit" value="送信" />
+      または <a href="/logout">サインアウト</a>
     </form>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script>
@@ -48,7 +49,7 @@
             const msg = eval('(' + e.data + ')');
             messages.append(
               $('<li>').append(
-                $('<img')
+                $('<img>')
                   .css({
                     width: 50,
                     verticalAlign: 'middle',
