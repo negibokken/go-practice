@@ -10,7 +10,13 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
 	"github.com/negibokken/go-practice/go-webapp/trace"
+	"github.com/stretchr/gomniauth"
+	"github.com/stretchr/gomniauth/providers/facebook"
+	"github.com/stretchr/gomniauth/providers/github"
+	"github.com/stretchr/gomniauth/providers/google"
+	"github.com/stretchr/objx"
 )
 
 const (
@@ -117,12 +123,36 @@ func (t *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	t.once.Do(func() {
 		t.templ = template.Must(template.ParseFiles(filepath.Join("templates", t.filename)))
 	})
-	t.templ.Execute(w, r)
+	data := map[string]interface{}{
+		"Host": r.Host,
+	}
+	if authCookie, err := r.Cookie("auth"); err == nil {
+		data["UserData"] = objx.MustFromBase64(authCookie.Value)
+	}
+
+	t.templ.Execute(w, data)
 }
 
 func main() {
 	var addr = flag.String("addr", ":8080", "アプリケーションのアドレス")
 	flag.Parse()
+
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatalln(".env が読み込めませんでした")
+	}
+
+	omniSecret := os.Getenv("OMNI_SECRET")
+	clientId := os.Getenv("CLIENT_ID")
+	clientSecret := os.Getenv("CLIENT_SECRET")
+
+	gomniauth.SetSecurityKey(omniSecret)
+	gomniauth.WithProviders(
+		facebook.New("クライアントID", "秘密の値", "http://localhost:8080/auth/callback/facebook"),
+		github.New("クライアントID", "秘密の値", "http://localhost:8080/auth/callback/github"),
+		google.New(clientId, clientSecret, "http://localhost:8080/auth/callback/google"),
+	)
+
 	r := newRoom()
 	r.tracer = trace.New(os.Stdout)
 	http.Handle("/chat", MustAuth(&templateHandler{filename: "chat.html"}))
