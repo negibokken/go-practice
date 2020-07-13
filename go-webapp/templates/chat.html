@@ -20,19 +20,19 @@
     </form>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script>
-      $(function() {
+      $(function () {
         console.log('in');
         let socket = null;
         const msgBox = $('#chatbox textarea');
         const messages = $('#messages');
-        $('#chatbox').submit(function() {
+        $('#chatbox').submit(function () {
           if (!msgBox.val()) return false;
           if (!socket) {
             alert('エラー: Websocket 接続が行われていません。');
             return false;
           }
           console.log(msgBox.val());
-          socket.send(msgBox.val());
+          socket.send(JSON.stringify({ Message: msgBox.val() }));
           msgBox.val('');
           return false;
         });
@@ -40,12 +40,18 @@
           alert('エラー: WebSocketに対応していないブラウザです。');
         } else {
           socket = new WebSocket('ws://{{.Host}}/room');
-          socket.onclose = function() {
+          socket.onclose = function () {
             alert('接続が終了しました。');
           };
-          socket.onmessage = function(e) {
+          socket.onmessage = function (e) {
             console.log('onmessaage', e.data);
-            messages.append($('<li>').text(e.data));
+            const msg = eval('(' + e.data + ')');
+            messages.append(
+              $('<li>').append(
+                $('<strong>').text(msg.Name + ': '),
+                $('<span>').text(msg.Message)
+              )
+            );
           };
         }
       });
