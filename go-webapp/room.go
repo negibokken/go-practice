@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -14,15 +15,17 @@ type room struct {
 	leave   chan *client
 	clients map[*client]bool
 	tracer  trace.Tracer
+	avatar  Avatar
 }
 
-func newRoom() *room {
+func newRoom(avatar Avatar) *room {
 	return &room{
 		forward: make(chan *message),
 		join:    make(chan *client),
 		leave:   make(chan *client),
 		clients: make(map[*client]bool),
 		tracer:  trace.Off(),
+		avatar:  avatar,
 	}
 }
 
@@ -70,6 +73,7 @@ func (r *room) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		room:     r,
 		userData: objx.MustFromBase64(authCookie.Value),
 	}
+	fmt.Println("mail", client.userData["mail"])
 	r.join <- client
 	defer func() { r.leave <- client }()
 	go client.write()

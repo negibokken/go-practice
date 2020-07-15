@@ -18,12 +18,11 @@ func (c *client) read() {
 	for {
 		var msg *message
 		if err := c.socket.ReadJSON(&msg); err == nil {
-			fmt.Println("msg: ", msg.Message)
+			fmt.Println("read msg: ", msg.Message)
 			msg.When = time.Now()
 			msg.Name = c.userData["name"].(string)
-			if avatarURL, ok := c.userData["avatar_url"]; ok {
-				msg.AvatarURL = avatarURL.(string)
-			}
+			msg.AvatarURL, _ = c.room.avatar.GetAvatarURL(c)
+			fmt.Println("avatar url: ", msg.AvatarURL)
 			c.room.forward <- msg
 		} else {
 			break
@@ -34,7 +33,7 @@ func (c *client) read() {
 
 func (c *client) write() {
 	for msg := range c.send {
-		fmt.Println("msg: ", msg.Message)
+		fmt.Println("write msg: ", msg.Message)
 		if err := c.socket.WriteJSON(msg); err != nil {
 			break
 		}
