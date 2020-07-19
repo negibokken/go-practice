@@ -30,4 +30,21 @@ func main() {
 	myPool.Put(instance)
 
 	myPool.Get()
+
+	zeroChan := make(chan struct{}, 0)
+	go func() {
+		close(zeroChan)
+	}()
+	<-zeroChan
+
+	ch := make(chan int)
+	close(ch)
+
+	for i := 0; i < 5; i++ {
+		select {
+		case <-ch:
+			fmt.Println("hello")
+		}
+	}
+
 }
