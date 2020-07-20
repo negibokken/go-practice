@@ -3,9 +3,21 @@ package main
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 type A struct{ a string }
+
+func testCh() <-chan string {
+	result := make(chan string)
+	go func() {
+		defer close(result)
+		for _, s := range []string{"a", "b", "c"} {
+			result <- s
+		}
+	}()
+	return result
+}
 
 func main() {
 	var wg sync.WaitGroup
@@ -47,4 +59,19 @@ func main() {
 		}
 	}
 
+	ch = make(chan int, 0)
+	select {
+	case <-ch:
+	case <-time.After(1 * time.Second):
+		fmt.Println("Timed out")
+	}
+
+	strs := []string{"a", "b", "c"}
+	for _, str := range strs {
+		fmt.Printf("str: %s\n", str)
+	}
+
+	for str := range testCh() {
+		fmt.Printf("str: %s\n", str)
+	}
 }
