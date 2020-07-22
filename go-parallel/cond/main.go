@@ -8,6 +8,16 @@ import (
 	"time"
 )
 
+type Hello struct {
+	str string
+}
+
+func (h Hello) N(n int) {
+	for i := 0; i < n; i++ {
+		fmt.Println("hello")
+	}
+}
+
 type A struct{ a string }
 
 func testCh() <-chan string {
@@ -22,6 +32,8 @@ func testCh() <-chan string {
 }
 
 func main() {
+	var h Hello
+	h.N(2)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -188,4 +200,84 @@ func locale(done <-chan interface{}) (string, error) {
 	case <-time.After(5 * time.Second):
 	}
 	return "EN/US", nil
+}
+
+func or(channels ...<-chan interface{}) <-chan interface{} {
+	switch len(channels) {
+	case 0:
+		return nil
+	case 1:
+		return channels[0]
+	}
+
+	orDone := make(chan interface{})
+	go func() {
+		switch len(channels) {
+		case 2:
+			select {
+			case <-channels[0]:
+			case <-channels[1]:
+			}
+		default:
+		case <-channels[0]:
+		case <-channels[1]:
+		case <-channels[2]:
+		case <-or(append(channels[3:], orDone)...):
+		}
+	}()
+	return orDone
+}
+
+type startGoroutineFn func(
+	done <-chan interface{},
+	pulseInterval time.Duration,
+) (heartbeat <-chan interface{})
+
+func newSteward2(
+	timeout time.Duration,
+	startGoroutine startGoroutineFn,
+) startGoroutineFn {
+	return func(
+		done <-chan interface{},
+		pulseInterval time.Duration,
+	) <-chan interface{} {
+		heartbeat := make(chan interface{})
+		go func() {
+			defer close(heartbeat)
+
+			// あとから上書きしたり制御するために親で定義する
+			var wardDone chan interface{}
+			var wardHeartbeat <-chan interface{}
+			startWard := func() {
+				wardDone = make(chan interface{})
+				wardHeartbeat = startGoroutine(or(wardDone, done), timeout/2)
+			}
+			startWard()
+			pulse := time.Tick(pulseInterval)
+
+		monitorLoop:
+			for {
+				timeoutSignal := time.After(timeout)
+				for {
+					select {
+					case <-pulse:
+						select {
+						case heartbeat <- struct{}{}:
+						default:
+						}
+					case <-wardHeartbeat:
+						continue monitorLoop
+					case <-timeoutSignal:
+						log.Println("steward: ward unhealthy; restarting")
+						close(wardDone)
+						startWard()
+						continue monitorLoop
+					case <-done:
+						return
+					}
+				}
+			}
+		}()
+		return heartbeat
+	}
 }
